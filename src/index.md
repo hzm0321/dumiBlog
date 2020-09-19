@@ -5,7 +5,7 @@ hero:
   desc: 柔水终成雕刀
   actions:
     - text: 开始阅读
-      link: /components
+      link: /nav
 features:
   - icon: /react.png
     title: React
