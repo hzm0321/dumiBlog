@@ -1,6 +1,6 @@
 ---
 group:
-  order: 2
+  order: 3
   title: 函数式编程
 title: 起步
 order: 0
