@@ -1,8 +1,9 @@
 ---
 group:
+  order: 1
   title: 组件
 title: ReactBaseClasses
-order: 0
+order: 1
 ---
 
 # ReactBaseClasses

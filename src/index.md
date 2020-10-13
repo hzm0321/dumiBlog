@@ -2,7 +2,7 @@
 title: 首页
 hero:
   title: 江南烟雨的博客
-  desc: 柔水终成雕刀
+  desc: 未到结局，焉知生死
   actions:
     - text: 开始阅读
       link: /nav
@@ -16,7 +16,7 @@ features:
   - icon: https://gw.alipayobjects.com/zos/bmw-prod/d1ee0c6f-5aed-4a45-a507-339a4bfe076c/k7bjsocq_w144_h144.png
     title: Feature 3
     desc: Balabala
-footer: Open-source MIT Licensed | Copyright © 2020<br />Powered by [dumi](https://d.umijs.org)
+footer: Open-source MIT Licensed | Copyright © 2020<br />[浙ICP备18037418号-2](https://beian.miit.gov.cn)<br />Powered by [dumi](https://d.umijs.org)
 ---
 
 ## 自动部署测试
