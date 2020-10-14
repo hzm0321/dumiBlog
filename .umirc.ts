@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     includes: ['src'],
   },
+  exportStatic: {},
   mode: 'site',
   navs: [null, { title: 'GitHub', path: 'https://github.com/hzm0321' }],
   // more config: https://d.umijs.org/config
