@@ -5,7 +5,7 @@ hero:
   desc: 未到结局，焉知生死
   actions:
     - text: 开始阅读
-      link: /nav
+      link: /react
 features:
   - icon: /react.png
     title: React
