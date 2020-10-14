@@ -255,3 +255,279 @@ function basicStateReducer<S>(state: S, action: BasicStateAction<S>): S {
   return typeof action === 'function' ? action(state) : action;
 }
 ```
+
+`basicStateReducer` 没有做太多事情，仅仅是做更新 `action` 的返回。我们最后看看本次更新的核心方法——`updateReducer`。
+
+```js
+function updateReducer<S, I, A>(
+  reducer: (S, A) => S,
+  initialArg: I,
+  init?: I => S,
+): [S, Dispatch<A>] {
+  // 正在处于更新阶段的 hook 结点
+  const hook = updateWorkInProgressHook();
+  const queue = hook.queue;
+  invariant(
+    queue !== null,
+    'Should have a queue. This is likely a bug in React. Please file an issue.',
+  );
+
+  // 组件最后一次渲染的 reducer
+  queue.lastRenderedReducer = reducer;
+
+  const current: Hook = (currentHook: any);
+
+  // 页面上已经更新的值的 update 队列
+  let baseQueue = current.baseQueue;
+
+  // 尚未更新的 hook 队列
+  let pendingQueue = queue.pending;
+  if (pendingQueue !== null) {
+    // 有尚未处理的更新,我们将它添加到 baseQueue
+    if (baseQueue !== null) {
+      // 合并 queue 和 baseQueue
+      let baseFirst = baseQueue.next;
+      let pendingFirst = pendingQueue.next;
+      baseQueue.next = pendingFirst;
+      pendingQueue.next = baseFirst;
+    }
+    current.baseQueue = baseQueue = pendingQueue;
+    queue.pending = null;
+  }
+
+  if (baseQueue !== null) {
+    // We have a queue to process.
+    let first = baseQueue.next;
+    let newState = current.baseState;
+
+    let newBaseState = null;
+    let newBaseQueueFirst = null;
+    let newBaseQueueLast = null;
+    let update = first;
+    do {
+      const updateExpirationTime = update.expirationTime;
+      if (updateExpirationTime < renderExpirationTime) {
+        // Priority is insufficient. Skip this update. If this is the first
+        // skipped update, the previous update/state is the new base
+        // update/state.
+        const clone: Update<S, A> = {
+          expirationTime: update.expirationTime,
+          suspenseConfig: update.suspenseConfig,
+          action: update.action,
+          eagerReducer: update.eagerReducer,
+          eagerState: update.eagerState,
+          next: (null: any),
+        };
+        if (newBaseQueueLast === null) {
+          newBaseQueueFirst = newBaseQueueLast = clone;
+          newBaseState = newState;
+        } else {
+          newBaseQueueLast = newBaseQueueLast.next = clone;
+        }
+        // Update the remaining priority in the queue.
+        if (updateExpirationTime > currentlyRenderingFiber.expirationTime) {
+          currentlyRenderingFiber.expirationTime = updateExpirationTime;
+          markUnprocessedUpdateTime(updateExpirationTime);
+        }
+      } else {
+        // This update does have sufficient priority.
+
+        if (newBaseQueueLast !== null) {
+          const clone: Update<S, A> = {
+            expirationTime: Sync, // This update is going to be committed so we never want uncommit it.
+            suspenseConfig: update.suspenseConfig,
+            action: update.action,
+            eagerReducer: update.eagerReducer,
+            eagerState: update.eagerState,
+            next: (null: any),
+          };
+          newBaseQueueLast = newBaseQueueLast.next = clone;
+        }
+
+        // Mark the event time of this update as relevant to this render pass.
+        // TODO: This should ideally use the true event time of this update rather than
+        // its priority which is a derived and not reverseable value.
+        // TODO: We should skip this update if it was already committed but currently
+        // we have no way of detecting the difference between a committed and suspended
+        // update here.
+        markRenderEventTimeAndConfig(
+          updateExpirationTime,
+          update.suspenseConfig,
+        );
+
+        // Process this update.
+        if (update.eagerReducer === reducer) {
+          // If this update was processed eagerly, and its reducer matches the
+          // current reducer, we can use the eagerly computed state.
+          newState = ((update.eagerState: any): S);
+        } else {
+          const action = update.action;
+          newState = reducer(newState, action);
+        }
+      }
+      update = update.next;
+    } while (update !== null && update !== first);
+
+    if (newBaseQueueLast === null) {
+      newBaseState = newState;
+    } else {
+      newBaseQueueLast.next = (newBaseQueueFirst: any);
+    }
+
+    // Mark that the fiber performed work, but only if the new state is
+    // different from the current state.
+    if (!is(newState, hook.memoizedState)) {
+      markWorkInProgressReceivedUpdate();
+    }
+
+    hook.memoizedState = newState;
+    hook.baseState = newBaseState;
+    hook.baseQueue = newBaseQueueLast;
+
+    queue.lastRenderedState = newState;
+  }
+  // 返回更新后的值和更新的 dispatch
+  const dispatch: Dispatch<A> = (queue.dispatch: any);
+  return [hook.memoizedState, dispatch];
+}
+```
+
+`updateReducer()` 会去遍历更新队列链表，执行每一个节点里面的更新操作，得到最新的状态并返回，以此来保证我们每次刷新组件都能拿到当前最新的状态。useState 的 reducer 是 `baseStateReducer`，因为传入的 `update.action` 是一个值，所以直接返回了 update.action 了，而 useReducer 的 reducer 是用户自定义的 reducer，所以会根据每次传入的 action 和每次循环得到的 newState 逐步计算出最新的状态。
+
+### 简化版 useState
+
+在理清楚了 `useState` 的基本原理后，实现了一个简化版的 `useState`。可拷贝代码到 HTML 文件直接运行。
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>useState</title>
+  </head>
+  <body>
+    <div id="count"></div>
+    <div id="newCount"></div>
+    <button onClick="func()">addCount</button>
+  </body>
+  <script>
+    let workInProgressHook = null; // 指向当前正在工作的 hook
+    let isMount = true; // 是否是挂载阶段
+    let func;
+
+    window.onload = () => {
+      func = schedule().click;
+    };
+
+    // 简化的 fiber 节点
+    const fiber = {
+      memoizedState: null, // 指向 hook 链
+      stateNode: App, // 任务节点
+    };
+
+    // 任务调度
+    function schedule() {
+      workInProgressHook = fiber.memoizedState; // 获取 fiber 上的 hook 链
+      const app = fiber.stateNode(); // 执行页面渲染
+      isMount = false;
+      return app;
+    }
+
+    function dispatchAction(queue, action) {
+      // 构建 update 链
+      const update = {
+        action,
+        next: null,
+      };
+      const pending = queue.pending;
+      if (pending === null) {
+        update.next = update;
+      } else {
+        update.next = pending.next;
+        pending.next = update;
+      }
+      queue.pending = update;
+      // 发起 fiber 任务调度
+      schedule();
+    }
+
+    function mountWorkInProgressHook() {
+      const hook = {
+        queue: { pending: null },
+        memoizedState: null,
+        next: null,
+      };
+      if (workInProgressHook === null) {
+        fiber.memoizedState = workInProgressHook = hook;
+      } else {
+        workInProgressHook = workInProgressHook.next = hook;
+      }
+      return workInProgressHook;
+    }
+
+    function updateWorkInProgressHook() {
+      const curWorkInProgressHook = workInProgressHook;
+      // hook 链指针后移
+      workInProgressHook = workInProgressHook.next;
+      return curWorkInProgressHook;
+    }
+
+    // 调用入口
+    function useState(initialState) {
+      return isMount ? mountState(initialState) : updateState();
+    }
+
+    function mountState(initialState) {
+      // 1. 获取 hooks 链上尾节点
+      hook = mountWorkInProgressHook();
+      // 2. 初始化参数
+      if (typeof initialState === 'function') {
+        initialState = initialState();
+      }
+      hook.memoizedState = initialState;
+      // 3. 设置参数更新的 dispatch
+      const dispatch = dispatchAction.bind(null, hook.queue);
+      return [hook.memoizedState, dispatch];
+    }
+
+    function updateState() {
+      // 1. 获取 hooks 链上头
+      hook = updateWorkInProgressHook();
+
+      // 2. 更新 state
+      let baseState = hook.memoizedState;
+      if (hook.queue.pending) {
+        let firstUpdate = hook.queue.pending.next; // 单向循环链表头节点
+        do {
+          const action = firstUpdate.action;
+          // 因为没有jsx,所以存在闭包,只支持传方法
+          if (typeof action !== 'function') {
+            throw new Error('需要接收一个方法');
+          }
+          baseState = action(baseState);
+          firstUpdate = firstUpdate.next;
+        } while (firstUpdate !== hook.queue.pending);
+        hook.queue.pending = null;
+      }
+      hook.memoizedState = baseState;
+      // 3. 设置参数更新的 dispatch
+      const dispatch = dispatchAction.bind(null, hook.queue);
+      return [hook.memoizedState, dispatch];
+    }
+
+    function App() {
+      const [count, setCount] = useState(0);
+      const [newCount, setNewCount] = useState(1);
+      document.getElementById('count').innerHTML = count;
+      document.getElementById('newCount').innerHTML = newCount;
+      return {
+        click() {
+          setCount(count => count + 1);
+          setNewCount(newCount => newCount + 2);
+        },
+      };
+    }
+  </script>
+</html>
+```
