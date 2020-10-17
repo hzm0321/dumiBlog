@@ -1,6 +1,6 @@
 ---
 group:
-  order: 1
+  order: 2
   title: 组件
 title: ReactBaseClasses
 order: 1

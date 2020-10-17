@@ -392,7 +392,7 @@ function updateReducer<S, I, A>(
 }
 ```
 
-`updateReducer()` 会去遍历更新队列链表，执行每一个节点里面的更新操作，得到最新的状态并返回，以此来保证我们每次刷新组件都能拿到当前最新的状态。useState 的 reducer 是 `baseStateReducer`，因为传入的 `update.action` 是一个值，所以直接返回了 update.action 了，而 useReducer 的 reducer 是用户自定义的 reducer，所以会根据每次传入的 action 和每次循环得到的 newState 逐步计算出最新的状态。
+`updateReducer()` 会去遍历更新队列链表，执行每一个节点里面的更新操作，得到最新的状态并返回，以此来保证我们每次刷新组件都能拿到当前最新的状态。useState 的 reducer 是 `basicStateReducer`，因为传入的 `update.action` 是一个值，所以直接返回了 update.action 了，而 useReducer 的 reducer 是用户自定义的 reducer，所以会根据每次传入的 action 和每次循环得到的 newState 逐步计算出最新的状态。
 
 ### 简化版 useState
 
